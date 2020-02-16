@@ -231,7 +231,7 @@ BOOL framebuffer_is_linear (FrameBuffer *self)
 *==========================================================================*/
 void framebuffer_clear (FrameBuffer *self)
   {
-  memset (self->fb_data, 0, self->stride * self->h);
+  memset (self->fb_data, 0, self->fb_data_size);
   }
 
 
