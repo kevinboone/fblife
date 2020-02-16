@@ -27,8 +27,6 @@
 #include "log.h" 
 #include "framebuffer.h" 
 
-#define max(a, b) ((a) > (b) ? (a) : (b))
-
 struct _FrameBuffer
   {
   int fd;
@@ -38,9 +36,7 @@ struct _FrameBuffer
   BYTE *fb_data;
   char *fbdev;
   int fb_bytes;
-  int line_length;
   int stride;
-  int slop;
   BOOL linear;
   }; 
 
@@ -82,17 +78,15 @@ BOOL framebuffer_init (FrameBuffer *self, char **error)
     log_debug ("fb_init: bpp %d",  vinfo.bits_per_pixel); 
     log_debug ("fb_init: line_length %d",  finfo.line_length); 
 
-    self->line_length = finfo.line_length; 
     self->w = vinfo.xres;
     self->h = vinfo.yres;
     int fb_bpp = vinfo.bits_per_pixel;
     int fb_bytes = fb_bpp / 8;
     self->fb_bytes = fb_bytes;
     self->fb_data_size = self->w * self->h * fb_bytes;
-    self->stride = max (self->line_length, self->w * self->fb_bytes);
-    self->slop = self->stride - (self->w * self->fb_bytes);
+    self->stride = finfo.line_length;
 
-    if (self->line_length == self->w * self->fb_bytes)
+    if (self->stride == self->w * self->fb_bytes)
       self->linear = TRUE;
     else
       self->linear = FALSE;
@@ -141,9 +135,11 @@ void framebuffer_deinit (FrameBuffer *self)
 void framebuffer_set_pixel (FrameBuffer *self, int x, int y, 
       BYTE r, BYTE g, BYTE b)
   {
-  if (x > 0 && x < self->w && y > 0 && y < self->h)
+  if (x >= 0 && x < self->w && y >= 0 && y < self->h)
     {
-    int index32 = (y * self->w + x) * self->fb_bytes + y * self->slop;
+    int index32 = (y * self->stride) + (x * self->fb_bytes);
+    if (index32 >= self->fb_data_size)
+      return;
     self->fb_data [index32++] = b;
     self->fb_data [index32++] = g;
     self->fb_data [index32++] = r;
@@ -188,9 +184,14 @@ int framebuffer_get_height (const FrameBuffer *self)
 void framebuffer_get_pixel (const FrameBuffer *self, 
                       int x, int y, BYTE *r, BYTE *g, BYTE *b)
   {
-  if (x > 0 && x < self->w && y > 0 && y < self->h)
+  if (x >= 0 && x < self->w && y >= 0 && y < self->h)
     {
-    int index32 = (y * self->w + x) * self->fb_bytes + (y * self->slop);
+    int index32 = (y * self->stride) + (x * self->fb_bytes);
+    if (index32 >= self->fb_data_size)
+      {
+      *r = *g = *b = 0;
+      return;
+      }
     *b = self->fb_data [index32++];
     *g = self->fb_data [index32++];
     *r = self->fb_data [index32];
