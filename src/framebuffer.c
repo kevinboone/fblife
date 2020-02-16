@@ -7,6 +7,7 @@
 ============================================================================*/
 
 #define _GNU_SOURCE
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
@@ -83,8 +84,8 @@ BOOL framebuffer_init (FrameBuffer *self, char **error)
     int fb_bpp = vinfo.bits_per_pixel;
     int fb_bytes = fb_bpp / 8;
     self->fb_bytes = fb_bytes;
-    self->fb_data_size = self->w * self->h * fb_bytes;
     self->stride = finfo.line_length;
+    self->fb_data_size = self->stride * self->h;
 
     if (self->stride == self->w * self->fb_bytes)
       self->linear = TRUE;
@@ -138,8 +139,7 @@ void framebuffer_set_pixel (FrameBuffer *self, int x, int y,
   if (x >= 0 && x < self->w && y >= 0 && y < self->h)
     {
     int index32 = (y * self->stride) + (x * self->fb_bytes);
-    if (index32 >= self->fb_data_size)
-      return;
+    assert(index32 < (self->fb_data_size - self->fb_bytes));
     self->fb_data [index32++] = b;
     self->fb_data [index32++] = g;
     self->fb_data [index32++] = r;
@@ -187,11 +187,7 @@ void framebuffer_get_pixel (const FrameBuffer *self,
   if (x >= 0 && x < self->w && y >= 0 && y < self->h)
     {
     int index32 = (y * self->stride) + (x * self->fb_bytes);
-    if (index32 >= self->fb_data_size)
-      {
-      *r = *g = *b = 0;
-      return;
-      }
+    assert(index32 < (self->fb_data_size - self->fb_bytes));
     *b = self->fb_data [index32++];
     *g = self->fb_data [index32++];
     *r = self->fb_data [index32];
